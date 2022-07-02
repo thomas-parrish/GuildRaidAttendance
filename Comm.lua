@@ -1,32 +1,67 @@
 local GRA, gra = unpack(select(2, ...))
 local L = select(2, ...).L
 
-local Compresser = LibStub:GetLibrary("LibCompress")
-local Encoder = Compresser:GetAddonEncodeTable()
 local Serializer = LibStub:GetLibrary("AceSerializer-3.0")
 local Comm = LibStub:GetLibrary("AceComm-3.0")
+local Compresser = LibStub:GetLibrary("LibCompress")
+local LibDeflate = LibStub:GetLibrary("LibDeflate")
+local LibSerialize = LibStub("LibSerialize")
+local configForLS = {
+    errorOnUnserializableType =  false
+  }
+local configForDeflate = {level = 9} -- the biggest bottleneck by far is in transmission and printing; so use maximal compression
 
 -- from WeakAuras
-local function TableToString(inTable)
-    local serialized = Serializer:Serialize(inTable)
-    local compressed = Compresser:CompressHuffman(serialized)
-    return Encoder:Encode(compressed)
-end
+local compressedTablesCache = {}
 
-local function StringToTable(inString)
-    local decoded = Encoder:Decode(inString)
-    local decompressed, errorMsg = Compresser:Decompress(decoded)
+function TableToString(inTable)
+    local serialized = LibSerialize:SerializeEx(configForLS, inTable)
+    local compressed
+    
+    -- get from / add to cache
+    if compressedTablesCache[serialized] then
+      compressed = compressedTablesCache[serialized].compressed
+      compressedTablesCache[serialized].lastAccess = time()
+    else
+      compressed = LibDeflate:CompressDeflate(serialized, configForDeflate)
+      compressedTablesCache[serialized] = {
+        compressed = compressed,
+        lastAccess = time(),
+      }
+    end
+    
+    -- remove cache items after 5 minutes
+    for k, v in pairs(compressedTablesCache) do
+      if v.lastAccess < (time() - 300) then
+        compressedTablesCache[k] = nil
+      end
+    end
+
+    local encoded = LibDeflate:EncodeForWoWAddonChannel(compressed)
+    print(encoded)
+    return encoded
+  end
+
+function StringToTable(inString)
+    decoded = LibDeflate:DecodeForWoWAddonChannel(inString)
+    if not decoded then
+      return "Error decoding."
+    end
+  
+    local decompressed, errorMsg = nil, "unknown compression method"
+    decompressed = LibDeflate:DecompressDeflate(decoded)
     if not(decompressed) then
-        GRA:Debug("Error decompressing: " .. errorMsg)
-        return nil
+      return "Error decompressing: " .. errorMsg
     end
-    local success, deserialized = Serializer:Deserialize(decompressed)
+
+    local success, deserialized
+    success, deserialized = LibSerialize:Deserialize(decompressed)
     if not(success) then
-        GRA:Debug("Error deserializing: " .. deserialized)
-        return nil
+      return "Error deserializing "..deserialized
     end
+
     return deserialized
-end
+  end
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
