@@ -51,7 +51,7 @@ local function SetNote(noteType, name, note, isRetry)
 	
 	local index = cache[name][3]
 
-	if GuildRosterFrame and GuildRosterFrame:IsVisible() then 
+	if GuildFrame and GuildFrame:IsVisible() then 
 		SetGuildRosterShowOffline(true)
 		GuildRosterShowOfflineButton:SetChecked(true)
 	end
@@ -143,9 +143,9 @@ end
 f:SetScript("OnEvent", function(self, event)
 	if event == "GUILD_ROSTER_UPDATE" then
 		-- make sure to get all guild members correctly
-		if not GuildRosterFrame then
+		if not GuildFrame then
 			SetGuildRosterShowOffline(true)
-		elseif not GuildRosterFrame:IsVisible() then
+		elseif not GuildFrame:IsVisible() then
 			SetGuildRosterShowOffline(true)
 		end
 
@@ -157,7 +157,6 @@ f:SetScript("OnEvent", function(self, event)
 			end
 
 			updating = true
-
 			for i = 1, n do
 				-- fullName, rank, rankIndex, level, class, zone, note, officernote, online, status, classFileName, achievementPoints, achievementRank, isMobile, canSoR, reputation = GetGuildRosterInfo(index)
 				local fullName, _, _, _, _, _, pnote, onote = GetGuildRosterInfo(i)
@@ -194,16 +193,16 @@ f:SetScript("OnEvent", function(self, event)
 end)
 
 local showOffline = false
-hooksecurefunc("GuildFrame_LoadUI", function()
-	GuildRosterFrame:HookScript("OnShow", function()
+hooksecurefunc("ToggleFriendsFrame", function()
+	GuildFrame:HookScript("OnShow", function()
 		SetGuildRosterShowOffline(showOffline)
-		GuildRosterShowOfflineButton:SetChecked(showOffline)
-		GuildRoster_Update()
+		GuildFrameLFGButton:SetChecked(showOffline)
+		GuildStatus_Update()
 	end)
-	GuildRosterFrame:HookScript("OnHide", function()
+	GuildFrame:HookScript("OnHide", function()
 		SetGuildRosterShowOffline(true)
-	end)
-	GuildRosterShowOfflineButton:HookScript("OnClick", function()
-		showOffline = GuildRosterShowOfflineButton:GetChecked()
+	end, LE_SCRIPT_BINDING_TYPE_INTRINSIC_POSTCALL)
+	GuildFrameLFGButton:HookScript("OnClick", function()
+		showOffline = GuildFrameLFGButton:GetChecked()
 	end)
 end)
